@@ -1,17 +1,21 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import os, requests, io
-from PIL import Image   # only for a quick “is this an image?” sanity-check
+import os, requests, io, imghdr
 
-HF_ENDPOINT = "https://api-inference.huggingface.co/models/prithivMLmods/deepfake-detector-model-v1"  # :contentReference[oaicite:0]{index=0}
-HF_TOKEN    = os.getenv("HF_TOKEN")   # <-- you’ll add this in Render’s dashboard
-
-headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+HF_ENDPOINT = (
+    "https://router.huggingface.co/hf-inference/models/"
+    "prithivMLmods/deepfake-detector-model"        # ← note: no “-v1” in slug
+)
+HF_TOKEN = os.getenv("HF_TOKEN")
+HEADERS  = {
+    "Authorization": f"Bearer {HF_TOKEN}" if HF_TOKEN else "",
+    "Content-Type":  "image/jpeg"
+}
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten to your Netlify URL later
+    allow_origins=["*"],         # tighten later
     allow_methods=["POST"],
     allow_headers=["*"],
 )
@@ -20,29 +24,16 @@ app.add_middleware(
 async def analyze(file: UploadFile = File(...)):
     img_bytes = await file.read()
 
-    # quick decode to be sure we actually got an image
-    try:
-        Image.open(io.BytesIO(img_bytes)).verify()
-    except Exception:
+    # quick sanity check that it's an image
+    if imghdr.what(None, img_bytes) is None:
         raise HTTPException(400, "Uploaded file is not a valid image")
 
-    # ----- call the hosted model -----
-    resp = requests.post(
-        HF_ENDPOINT,
-        headers=headers,
-        data=img_bytes,
-        timeout=30,
-    )
+    # ------ call the router endpoint ------
+    resp = requests.post(HF_ENDPOINT, headers=HEADERS, data=img_bytes, timeout=30)
     if resp.status_code != 200:
-        raise HTTPException(502, f"HF API error: {resp.text}")
+        raise HTTPException(resp.status_code, f"HF error: {resp.text}")
 
-    predictions = resp.json()  # [{'label':'fake','score':0.91}, ...]
-    if not isinstance(predictions, list):
-        raise HTTPException(502, f"Unexpected HF response: {predictions}")
-
-    fake_score = next((p["score"] for p in predictions if p["label"] == "fake"), None)
-    if fake_score is None:
-        raise HTTPException(502, "No 'fake' label in HF response")
-
-    real_prob = 1 - fake_score
-    return {"is_real": real_prob > fake_score, "confidence": max(real_prob, fake_score)}
+    preds = resp.json()          # [{'label':'fake','score':0.91}, ...]
+    fake = next(p["score"] for p in preds if p["label"] == "fake")
+    real = 1 - fake
+    return {"is_real": real > fake, "confidence": max(real, fake)}
