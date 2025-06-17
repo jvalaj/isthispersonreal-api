@@ -1,39 +1,48 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from transformers import AutoImageProcessor, SiglipForImageClassification
-from PIL import Image
-import torch, io
+import os, requests, io
+from PIL import Image   # only for a quick “is this an image?” sanity-check
 
-MODEL_NAME = "prithivMLmods/deepfake-detector-model-v1"  # HF model card :contentReference[oaicite:0]{index=0}
-processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
-model = SiglipForImageClassification.from_pretrained(MODEL_NAME)
-id2label = {0: "fake", 1: "real"}
+HF_ENDPOINT = "https://api-inference.huggingface.co/models/prithivMLmods/deepfake-detector-model-v1"  # :contentReference[oaicite:0]{index=0}
+HF_TOKEN    = os.getenv("HF_TOKEN")   # <-- you’ll add this in Render’s dashboard
+
+headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # tighten to your Netlify URL later
     allow_methods=["POST"],
     allow_headers=["*"],
 )
 
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
-    # --- load uploaded bytes into PIL ---
     img_bytes = await file.read()
+
+    # quick decode to be sure we actually got an image
     try:
-        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        Image.open(io.BytesIO(img_bytes)).verify()
     except Exception:
-        raise HTTPException(400, "Cannot decode image")
+        raise HTTPException(400, "Uploaded file is not a valid image")
 
-    # --- run the SigLIP classifier ---
-    inputs = processor(images=image, return_tensors="pt")
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    probs = torch.softmax(logits, dim=1)[0]
-    fake_prob, real_prob = float(probs[0]), float(probs[1])
+    # ----- call the hosted model -----
+    resp = requests.post(
+        HF_ENDPOINT,
+        headers=headers,
+        data=img_bytes,
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        raise HTTPException(502, f"HF API error: {resp.text}")
 
-    return {
-        "is_real": real_prob > fake_prob,
-        "confidence": max(real_prob, fake_prob)
-    }
+    predictions = resp.json()  # [{'label':'fake','score':0.91}, ...]
+    if not isinstance(predictions, list):
+        raise HTTPException(502, f"Unexpected HF response: {predictions}")
+
+    fake_score = next((p["score"] for p in predictions if p["label"] == "fake"), None)
+    if fake_score is None:
+        raise HTTPException(502, "No 'fake' label in HF response")
+
+    real_prob = 1 - fake_score
+    return {"is_real": real_prob > fake_score, "confidence": max(real_prob, fake_score)}

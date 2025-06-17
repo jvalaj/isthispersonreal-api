@@ -1,11 +1,8 @@
-# requirements.txt  (top of file)
---extra-index-url https://download.pytorch.org/whl/cpu
+# keep NumPy below 2.0 so anything that imports it is happy
+numpy==1.26.4
 
-numpy==1.26.4          # pin < 2.0 so PyTorch imports cleanly
-torch==2.2.2+cpu
-transformers==4.41.1
-accelerate==0.30.1
-pillow
+# tiny HTTP + ASGI stack
+requests
 fastapi
 uvicorn[standard]
 python-multipart
