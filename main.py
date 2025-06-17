@@ -3,12 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import os, requests, io, imghdr
 
 HF_ENDPOINT = (
-    "https://router.huggingface.co/hf-inference/models/"
-    "prithivMLmods/deepfake-detector-model"        # ← note: no “-v1” in slug
+    "https://router.huggingface.co/hf-inference/models/prithivMLmods/deepfake-detector-model"        # ← note: no “-v1” in slug
 )
 HF_TOKEN = os.getenv("HF_TOKEN")
 HEADERS  = {
-    "Authorization": f"Bearer {HF_TOKEN}" if HF_TOKEN else "",
+    "Authorization": f"Bearer {HF_TOKEN}",
     "Content-Type":  "image/jpeg"
 }
 
