@@ -4,5 +4,6 @@ numpy==1.26.4
 # tiny HTTP + ASGI stack
 requests
 fastapi
+pillow
 uvicorn[standard]
 python-multipart
