@@ -1,4 +1,6 @@
 fastapi
 uvicorn[standard]
-deepface
+deepface==0.0.79          # pin a known-good release
+tensorflow-cpu==2.15.0    # CPU-only build is 100 MB smaller than the “full” TF
+tf-keras==2.15.0          # <- what RetinaFace is asking for
 python-multipart
