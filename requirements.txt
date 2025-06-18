@@ -1,9 +1,6 @@
-# keep NumPy below 2.0 so anything that imports it is happy
-numpy==1.26.4
-
-# tiny HTTP + ASGI stack
-requests
 fastapi
-pillow
-uvicorn[standard]
-python-multipart
+uvicorn
+sentencepiece
+transformers
+torch
+Pillow
