@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from transformers import AutoImageProcessor, AutoModelForImageClassification
+from transformers import AutoProcessor, AutoModelForImageClassification
 from PIL import Image
 import torch
 import imghdr
@@ -14,9 +14,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Load model directly
-
-processor = AutoImageProcessor.from_pretrained("prithivMLmods/Deep-Fake-Detector-v2-Model")
-model = AutoModelForImageClassification.from_pretrained("prithivMLmods/Deep-Fake-Detector-v2-Model")
+processor = AutoProcessor.from_pretrained("prithivMLmods/deepfake-detector-model-v1")
+model = AutoModelForImageClassification.from_pretrained("prithivMLmods/deepfake-detector-model-v1")
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
     img_bytes = await file.read()
