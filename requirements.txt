@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-sentencepiece
 transformers
 torch
 Pillow
